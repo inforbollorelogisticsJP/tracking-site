@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bolloré Logistics Mexico - Tracking</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f5f7fa;
+}
+
+header {
+    background: #002f6c;
+    color: white;
+    padding: 15px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+nav a {
+    color: white;
+    margin-left: 20px;
+    text-decoration: none;
+}
+
+.hero {
+    background: linear-gradient(135deg,#004aad,#007bff);
+    color: white;
+    text-align: center;
+    padding: 60px 20px;
+}
+
+.tracking-box {
+    background: white;
+    max-width: 600px;
+    margin: -30px auto 40px;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    display: flex;
+    gap: 10px;
+}
+
+.tracking-box input {
+    flex: 1;
+    padding: 12px;
+}
+
+.tracking-box button {
+    background: #004aad;
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    cursor: pointer;
+}
+
+.admin-box {
+    background: white;
+    max-width: 600px;
+    margin: 20px auto;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.admin-box input {
+    padding: 10px;
+    margin: 5px;
+    width: 40%;
+}
+
+.admin-box button {
+    padding: 10px 15px;
+    background: red;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+.container {
+    display: flex;
+    gap: 20px;
+    padding: 20px 40px;
+}
+
+.map {
+    flex: 3;
+    background: #dfe6e9;
+    height: 400px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.dot {
+    width: 15px;
+    height: 15px;
+    background: red;
+    border-radius: 50%;
+    position: absolute;
+    animation: move 6s linear infinite;
+}
+
+@keyframes move {
+    0% { left: 10%; top: 70%; }
+    50% { left: 50%; top: 40%; }
+    100% { left: 80%; top: 20%; }
+}
+
+.sidebar {
+    flex: 1;
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+}
+
+.status {
+    margin-bottom: 10px;
+    padding: 10px;
+    background: #eef3ff;
+    border-radius: 6px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: 0.5s;
+}
+
+.status.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.progress {
+    height: 8px;
+    background: #ddd;
+    border-radius: 10px;
+    margin: 15px 0;
+}
+
+.progress-bar {
+    height: 8px;
+    width: 0%;
+    background: #004aad;
+    border-radius: 10px;
+    transition: 2s;
+}
+
+footer {
+    background: #002f6c;
+    color: white;
+    text-align: center;
+    padding: 20px;
+}
+</style>
+
+</head>
+
+<body>
+
+<header>
+    <h1>Bolloré Logistics Mexico</h1>
+</header>
+
+<section class="hero">
+    <h2>Track Your Shipment in Real-Time</h2>
+</section>
+
+<div class="tracking-box">
+    <input type="text" id="trackInput" placeholder="Enter Tracking Number">
+    <button onclick="startTracking()">Track</button>
+</div>
+
+<div class="admin-box">
+    <h3>Admin Panel</h3>
+
+    <input id="adminUser" placeholder="Username">
+    <input id="adminPass" type="password" placeholder="Password">
+
+    <button onclick="login()">Login</button>
+    <button onclick="generateTracking()">Generate Tracking Number</button>
+
+    <p id="generatedCode"></p>
+</div>
+
+<div class="container">
+
+    <div class="map">
+        <div class="dot"></div>
+        Live Shipment Movement
+    </div>
+
+    <div class="sidebar">
+        <h3>Shipment Details</h3>
+
+        <div class="progress">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+
+        <div class="status" id="s1">✔ Shipment Registered</div>
+        <div class="status" id="s2">✔ Health Check Completed</div>
+        <div class="status" id="s3">✔ In Transit</div>
+        <div class="status" id="s4">✔ Arrived at Destination City</div>
+        <div class="status" id="s5">✔ Out for Delivery</div>
+
+    </div>
+
+</div>
+
+<footer>
+    <p>© 2026 Bolloré Logistics Mexico</p>
+</footer>
+
+<script>
+const API = "http://localhost:3000";
+let loggedIn = false;
+
+async function login() {
+    const res = await fetch(API + "/admin/login", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+            username: adminUser.value,
+            password: adminPass.value
+        })
+    });
+
+    loggedIn = res.ok;
+    alert(loggedIn ? "Logged in" : "Invalid login");
+}
+
+async function generateTracking() {
+    if (!loggedIn) return alert("Login first");
+
+    const res = await fetch(API + "/create", { method: "POST" });
+    const data = await res.json();
+
+    generatedCode.innerText = data.code;
+}
+
+async function startTracking() {
+    const code = trackInput.value;
+
+    const res = await fetch(API + "/track/" + code);
+
+    if (!res.ok) return alert("Not found");
+
+    const data = await res.json();
+
+    progressBar.style.width = data.progress + "%";
+
+    let steps = ["s1","s2","s3","s4","s5"];
+
+    steps.forEach((id, i) => {
+        setTimeout(() => {
+            document.getElementById(id).classList.add("show");
+        }, i * 400);
+    });
+}
+</script>
+
+</body>
+</html>
