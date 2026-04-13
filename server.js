@@ -33,6 +33,11 @@ function generateCode() {
   return `BLM-${d.getFullYear()}${d.getMonth() + 1}${d.getDate()}-${Math.floor(Math.random() * 100000)}`;
 }
 
+// ---------------- TEST ROUTE ----------------
+app.get("/", (req, res) => {
+  res.send("Tracking API is running 🚀");
+});
+
 // ---------------- ADMIN LOGIN ----------------
 app.post("/admin/login", (req, res) => {
   const { username, password } = req.body || {};
@@ -41,75 +46,83 @@ app.post("/admin/login", (req, res) => {
     return res.json({ success: true });
   }
 
-  return res.status(401).json({ success: false, message: "Invalid credentials" });
+  return res.status(401).json({ success: false });
 });
 
 // ---------------- CREATE SHIPMENT ----------------
 app.post("/create", async (req, res) => {
-  const code = generateCode();
+  try {
+    const code = generateCode();
 
-  const { error } = await supabase.from("tracking").insert([
-    {
-      code,
-      step: 0,
-      progress: 0,
-      history: [route[0]],
-      lastUpdate: Date.now()
-    }
-  ]);
+    const { error } = await supabase.from("tracking").insert([
+      {
+        code,
+        step: 0,
+        progress: 0,
+        history: [route[0]],
+        lastUpdate: Date.now()
+      }
+    ]);
 
-  if (error) {
-    return res.status(500).json({ error: error.message });
+    if (error) throw error;
+
+    res.json({ code });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to create tracking" });
   }
-
-  res.json({ code });
 });
 
 // ---------------- TRACK SHIPMENT ----------------
 app.get("/track/:code", async (req, res) => {
-  const code = req.params.code;
+  try {
+    const code = req.params.code;
 
-  const { data, error } = await supabase
-    .from("tracking")
-    .select("*")
-    .eq("code", code)
-    .single();
-
-  if (error || !data) {
-    return res.status(404).json({ error: "Tracking code not found" });
-  }
-
-  const now = Date.now();
-
-  // auto movement every 5 seconds
-  if (data.step < route.length - 1 && now - data.lastUpdate >= 5000) {
-    data.step++;
-    data.history.push(route[data.step]);
-    data.progress = Math.round((data.step / (route.length - 1)) * 100);
-    data.lastUpdate = now;
-
-    await supabase
+    const { data, error } = await supabase
       .from("tracking")
-      .update({
-        step: data.step,
-        progress: data.progress,
-        history: data.history,
-        lastUpdate: data.lastUpdate
-      })
-      .eq("code", code);
+      .select("*")
+      .eq("code", code)
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ error: "Tracking not found" });
+    }
+
+    const now = Date.now();
+
+    if (data.step < route.length - 1 && now - data.lastUpdate >= 5000) {
+      data.step++;
+      data.history.push(route[data.step]);
+      data.progress = Math.round((data.step / (route.length - 1)) * 100);
+      data.lastUpdate = now;
+
+      await supabase
+        .from("tracking")
+        .update({
+          step: data.step,
+          progress: data.progress,
+          history: data.history,
+          lastUpdate: data.lastUpdate
+        })
+        .eq("code", code);
+    }
+
+    res.json({
+      code: data.code,
+      progress: data.progress,
+      current: data.history[data.history.length - 1],
+      history: data.history
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Tracking error" });
   }
-
-  const current = data.history[data.history.length - 1];
-
-  res.json({
-    code: data.code,
-    progress: data.progress,
-    current,
-    history: data.history
-  });
 });
 
 // ---------------- SERVER ----------------
-app.listen(3000, () => {
-  console.log("Server running on http://localhost:3000");
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("Server running on port " + PORT);
 });
